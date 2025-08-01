@@ -41,9 +41,9 @@ else:
     edate=sys.argv[2]  
     path_config=sys.argv[3]
     path_inflow=sys.argv[4]
-    ws_range=[sys.argv[5],sys.argv[6]]
-    wd_range=[sys.argv[7],sys.argv[8]]
-    tke_range=[sys.argv[9],sys.argv[10]]
+    ws_range=[np.float64(sys.argv[5]),np.float64(sys.argv[6])]
+    wd_range=[np.float64(sys.argv[7]),np.float64(sys.argv[8])]
+    tke_range=[np.float64(sys.argv[9]),np.float64(sys.argv[10])]
  
 #stats
 min_range=90#[m] minimum range

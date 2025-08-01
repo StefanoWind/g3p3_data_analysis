@@ -28,6 +28,49 @@ plt.close('all')
 #%% Inputs
 source_inflow=os.path.join(cd,'data/g3p3/roof.lidar.z01.c2/roof.lidar.z01.c2.20250314.20250720.csv')
 
+#stats
+bin_hour=np.arange(25)
+perc_lim=[5,95]
+p_value=0.05
+
+#%% Functions
+def filt_stat(x,func,perc_lim=[5,95]):
+    '''
+    Statistic with percentile filter
+    '''
+    x_filt=x.copy()
+    lb=np.nanpercentile(x_filt,perc_lim[0])
+    ub=np.nanpercentile(x_filt,perc_lim[1])
+    x_filt=x_filt[(x_filt>=lb)*(x_filt<=ub)]
+       
+    return func(x_filt)
+
+def filt_BS_stat(x,func,p_value=5,M_BS=100,min_N=10,perc_lim=[5,95]):
+    '''
+    Statstics with percentile filter and bootstrap
+    '''
+    x_filt=x.copy()
+    lb=np.nanpercentile(x_filt,perc_lim[0])
+    ub=np.nanpercentile(x_filt,perc_lim[1])
+    x_filt=x_filt[(x_filt>=lb)*(x_filt<=ub)]
+    
+    if len(x_filt)>=min_N:
+        x_BS=bootstrap(x_filt,M_BS)
+        stat=func(x_BS,axis=1)
+        BS=np.nanpercentile(stat,p_value)
+    else:
+        BS=np.nan
+    return BS
+
+def bootstrap(x,M):
+    '''
+    Bootstrap sample drawer
+    '''
+    i=np.random.randint(0,len(x),size=(M,len(x)))
+    x_BS=x[i]
+    return x_BS
+
+
 #%% Initialization
 
 #read inflow data
@@ -39,8 +82,22 @@ ws=inflow.ws.values
 wd=inflow.wd.values
 tke=inflow.tke.values
 
-#%% Main
 
+#%% Main
+hour=np.array([(t-np.datetime64(str(t)[:10]))/np.timedelta64(1,'h') for t in inflow.time.values])
+
+#daily cycles of temperature
+hour_avg=(bin_hour[:-1]+bin_hour[1:])/2
+
+f_avg_all=np.zeros(len(hour_avg))
+f_low_all=np.zeros(len(hour_avg))
+f_top_all=np.zeros(len(hour_avg))
+
+f_sel=tke
+real=~np.isnan(f_sel)
+f_avg= stats.binned_statistic(hour[real], f_sel[real],statistic=lambda x: filt_stat(x,   np.nanmean,perc_lim=perc_lim),                          bins=bin_hour)[0]
+f_low= stats.binned_statistic(hour[real], f_sel[real],statistic=lambda x: filt_BS_stat(x,np.nanmean,perc_lim=perc_lim,p_value=p_value/2*100),    bins=bin_hour)[0]
+f_top= stats.binned_statistic(hour[real], f_sel[real],statistic=lambda x: filt_BS_stat(x,np.nanmean,perc_lim=perc_lim,p_value=(1-p_value/2)*100),bins=bin_hour)[0]
 
 
 #%% Plots
