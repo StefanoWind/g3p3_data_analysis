@@ -74,6 +74,7 @@ output.index.name='Time (UTC)'
 
 t1=str(data.time.values[0])[:10].replace('-','')
 t2=str(data.time.values[-1])[:10].replace('-','')
-output.to_csv(os.path.join(cd,'data','g3p3','roof.lidar.z01.c2',f'roof.lidar.z01.c2.{t1}.{t2}.csv'))
+os.makedirs(os.path.join(config['path_data'],'g3p3','roof.lidar.z01.c2'),exist_ok=True)
+output.to_csv(os.path.join(config['path_data'],'g3p3','roof.lidar.z01.c2',f'roof.lidar.z01.c2.{t1}.{t2}.csv'))
     
     
