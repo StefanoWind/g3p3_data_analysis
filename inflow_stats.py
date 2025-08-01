@@ -5,22 +5,18 @@ Plot inflow stats
 
 import os
 cd=os.path.dirname(__file__)
-import sys
 import warnings
-from datetime import datetime
-import yaml
 import pandas as pd
 import numpy as np
-import glob
 import xarray as xr
 from scipy import stats
-import scipy as sp
+from scipy.stats import weibull_min
 from matplotlib import pyplot as plt
 from windrose import WindroseAxes
 import matplotlib
 matplotlib.rcParams['font.family'] = 'serif'
 matplotlib.rcParams['mathtext.fontset'] = 'cm'
-matplotlib.rcParams['font.size'] = 16
+matplotlib.rcParams['font.size'] = 14
 matplotlib.rcParams['savefig.dpi'] = 500
 warnings.filterwarnings('ignore')
 plt.close('all')
@@ -93,12 +89,23 @@ f_avg_all=np.zeros(len(hour_avg))
 f_low_all=np.zeros(len(hour_avg))
 f_top_all=np.zeros(len(hour_avg))
 
+f_sel=ws
+real=~np.isnan(f_sel)
+ws_avg= stats.binned_statistic(hour[real], f_sel[real],statistic=lambda x: filt_stat(x,   np.nanmean,perc_lim=perc_lim),                          bins=bin_hour)[0]
+ws_low= stats.binned_statistic(hour[real], f_sel[real],statistic=lambda x: filt_BS_stat(x,np.nanmean,perc_lim=perc_lim,p_value=p_value/2*100),    bins=bin_hour)[0]
+ws_top= stats.binned_statistic(hour[real], f_sel[real],statistic=lambda x: filt_BS_stat(x,np.nanmean,perc_lim=perc_lim,p_value=(1-p_value/2)*100),bins=bin_hour)[0]
+
 f_sel=tke
 real=~np.isnan(f_sel)
-f_avg= stats.binned_statistic(hour[real], f_sel[real],statistic=lambda x: filt_stat(x,   np.nanmean,perc_lim=perc_lim),                          bins=bin_hour)[0]
-f_low= stats.binned_statistic(hour[real], f_sel[real],statistic=lambda x: filt_BS_stat(x,np.nanmean,perc_lim=perc_lim,p_value=p_value/2*100),    bins=bin_hour)[0]
-f_top= stats.binned_statistic(hour[real], f_sel[real],statistic=lambda x: filt_BS_stat(x,np.nanmean,perc_lim=perc_lim,p_value=(1-p_value/2)*100),bins=bin_hour)[0]
+tke_avg= stats.binned_statistic(hour[real], f_sel[real],statistic=lambda x: filt_stat(x,   np.nanmean,perc_lim=perc_lim),                          bins=bin_hour)[0]
+tke_low= stats.binned_statistic(hour[real], f_sel[real],statistic=lambda x: filt_BS_stat(x,np.nanmean,perc_lim=perc_lim,p_value=p_value/2*100),    bins=bin_hour)[0]
+tke_top= stats.binned_statistic(hour[real], f_sel[real],statistic=lambda x: filt_BS_stat(x,np.nanmean,perc_lim=perc_lim,p_value=(1-p_value/2)*100),bins=bin_hour)[0]
 
+#weibull fit
+counts, bins, _ = plt.hist(ws, bins=100, density=True, alpha=0.5, label='Histogram')
+c, loc, scale  = weibull_min.fit(ws[~np.isnan(ws)], floc=0) 
+
+pdf = weibull_min.pdf((bins[1:]+bins[:-1])/2, c, loc=loc, scale=scale)
 
 #%% Plots
 cmap=matplotlib.cm.get_cmap('viridis')
@@ -114,5 +121,29 @@ for label in ax.get_yticklabels():
     label.set_bbox(dict(facecolor='white', edgecolor='none', boxstyle='round,pad=0.3',alpha=0.5))
 
 plt.legend(draggable=True)
+
+plt.figure(figsize=(14,7))
+plt.subplot(1,2,1)
+plt.plot(hour_avg,ws_avg,'.-k',markersize=10)
+plt.fill_between(hour_avg,ws_low,ws_top,color='k',alpha=0.25)
+plt.xlabel('Hour (UTC)')
+plt.ylabel(r'Wind speed (140-160 m.a.g.l.) [m s$^{-1}$]')
+plt.grid()
+
+plt.subplot(1,2,2)
+plt.plot(hour_avg,tke_avg,'.-k',markersize=10)
+plt.fill_between(hour_avg,tke_low,tke_top,color='k',alpha=0.25)
+plt.xlabel('Hour (UTC)')
+plt.ylabel(r'TKE (140-160 m.a.g.l.) [m$^2$ s$^{-2}$]')
+plt.grid()
+
+plt.figure()
+plt.bar((bins[1:]+bins[:-1])/2,counts,width=np.diff(bins)[0],color='k',label='Data')
+plt.plot((bins[1:]+bins[:-1])/2,pdf,'r',label=f'Weibull fit: shape = {c:.2f}, scale = {scale:.2f}')
+plt.xlabel(r'Wind speed (140-160 m.a.g.l.) [m s$^{-1}$]')
+plt.ylabel('P.d.f.')
+plt.grid()
+plt.legend()
+
 
 

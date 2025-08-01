@@ -131,36 +131,39 @@ y_all=[]
 u_all=[]
 i_f=0
 for f in files_sel[(sel_ws*sel_ws*sel_tke).values]:
-    data=xr.open_dataset(f)
-    data=data.where((data.range>=min_range)*(data.range<=max_range),drop=True)
-    
-    #cos fit
-    azi=data.azimuth.transpose('range','beamID','scanID').values.ravel()
-    rws=data.wind_speed.where(data.qc_wind_speed==0).values.ravel()
-    real=~np.isnan(azi+rws)
-    popt = sp.optimize.curve_fit(cos_fit, azi[real], -rws[real],bounds=([0,0], [30,360]),
-                                 p0=(inflow_int.ws.isel(time=i_f),inflow_int.wd.isel(time=i_f)))[0]
-    
-    # select azimuth
-    data=data.where((data.azimuth>=min_azi)*(data.azimuth<=max_azi),drop=True)
-    
-    #exclude blind cone
-    excl_g3p3=(data.azimuth>config['g3p3_azi']-azi_thickness/2)*(data.azimuth<config['g3p3_azi']+azi_thickness/2)*(data.range>config['g3p3_range'])
-    data=data.where(~excl_g3p3)
-    excl_hotsstar=(data.azimuth>config['hotsstar_azi']-azi_thickness/2)*(data.azimuth<config['hotsstar_azi']+azi_thickness/2)*(data.range>config['hotsstar_range'])
-    data=data.where(~excl_hotsstar)
-    
-    #deproject velocity
-    angle=np.radians(data.azimuth-popt[1])
-    u=-data.wind_speed.where(data.qc_wind_speed==0)/np.cos(angle)
-    u=u.where((u/popt[0]>u_lim[0])*(u/popt[0]<u_lim[1]))
-    
-    #stack data
-    real=~np.isnan(u.values.ravel())
-    x_all=np.append(x_all,data.x.values.ravel()[real])
-    y_all=np.append(y_all,data.y.values.ravel()[real])
-    u_all=np.append(u_all,u.values.ravel()[real])
-    
+    try:
+        data=xr.open_dataset(f)
+        data=data.where((data.range>=min_range)*(data.range<=max_range),drop=True)
+        
+        #cos fit
+        azi=data.azimuth.transpose('range','beamID','scanID').values.ravel()
+        rws=data.wind_speed.where(data.qc_wind_speed==0).values.ravel()
+        real=~np.isnan(azi+rws)
+        popt = sp.optimize.curve_fit(cos_fit, azi[real], -rws[real],bounds=([0,0], [30,360]),
+                                     p0=(inflow_int.ws.isel(time=i_f),inflow_int.wd.isel(time=i_f)))[0]
+        
+        # select azimuth
+        data=data.where((data.azimuth>=min_azi)*(data.azimuth<=max_azi),drop=True)
+        
+        #exclude blind cone
+        excl_g3p3=(data.azimuth>config['g3p3_azi']-azi_thickness/2)*(data.azimuth<config['g3p3_azi']+azi_thickness/2)*(data.range>config['g3p3_range'])
+        data=data.where(~excl_g3p3)
+        excl_hotsstar=(data.azimuth>config['hotsstar_azi']-azi_thickness/2)*(data.azimuth<config['hotsstar_azi']+azi_thickness/2)*(data.range>config['hotsstar_range'])
+        data=data.where(~excl_hotsstar)
+        
+        #deproject velocity
+        angle=np.radians(data.azimuth-popt[1])
+        u=-data.wind_speed.where(data.qc_wind_speed==0)/np.cos(angle)
+        u=u.where((u/popt[0]>u_lim[0])*(u/popt[0]<u_lim[1]))
+        
+        #stack data
+        real=~np.isnan(u.values.ravel())
+        x_all=np.append(x_all,data.x.values.ravel()[real])
+        y_all=np.append(y_all,data.y.values.ravel()[real])
+        u_all=np.append(u_all,u.values.ravel()[real])
+        
+    except Exception as e:
+        print(f"An error occurred at file {f}: {e}")
     i_f+=1
     
 #bin average
