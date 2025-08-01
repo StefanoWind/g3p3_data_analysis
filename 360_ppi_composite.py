@@ -31,7 +31,7 @@ if len(sys.argv)==1:
     sdate='2025-05-01' #start date
     edate='2025-07-02' #end date
     path_config=os.path.join(cd,'configs/config.yaml') #config path
-    path_inflow='roof.lidar.z01.c2.20250528.20250531.csv'
+    path_inflow='roof.lidar.z01.c2.20250314.20250720.csv'
     ws_range=[5,12]
     wd_range=[170,190]
     tke_range=[0,1]
@@ -136,11 +136,19 @@ for f in files_sel[(sel_ws*sel_ws*sel_tke).values]:
         data=data.where((data.range>=min_range)*(data.range<=max_range),drop=True)
         
         #cos fit
+        ws=np.round(np.float64(inflow_int.ws.isel(time=i_f)),2)
+        wd=np.round(np.float64(inflow_int.wd.isel(time=i_f)),2)
+        print(f'Attempting cosine fit with initial guess {[ws,wd]}',flush=True)
+        
         azi=data.azimuth.transpose('range','beamID','scanID').values.ravel()
         rws=data.wind_speed.where(data.qc_wind_speed==0).values.ravel()
         real=~np.isnan(azi+rws)
         popt = sp.optimize.curve_fit(cos_fit, azi[real], -rws[real],bounds=([0,0], [30,360]),
-                                     p0=[inflow_int.ws.isel(time=i_f),inflow_int.wd.isel(time=i_f)])[0]
+                                     p0=[ws,wd])[0]
+        
+        # if popt[0]<ws_range[0] or popt[0]>ws_range[1] or popt[1]<wd_range[0] or popt[1]>wd_range[1]:
+        #     print(f'Wind speed or direction outside of range, skipping {f}')
+        #     continue
         
         # select azimuth
         data=data.where((data.azimuth>=min_azi)*(data.azimuth<=max_azi),drop=True)
