@@ -28,11 +28,11 @@ plt.close('all')
 
 #users inputs
 if len(sys.argv)==1:
-    sdate='2025-05-01' #start date
+    sdate='2025-03-01' #start date
     edate='2025-07-02' #end date
     path_config=os.path.join(cd,'configs/config.yaml') #config path
     path_inflow='roof.lidar.z01.c2.20250314.20250720.csv'
-    ws_range=[5,12]
+    ws_range=[5,8]
     wd_range=[170,190]
     tke_range=[0,1]
     
@@ -130,7 +130,7 @@ x_all=[]
 y_all=[]
 u_all=[]
 i_f=0
-for f in files_sel[(sel_ws*sel_ws*sel_tke).values]:
+for f in files_sel[(sel_ws*sel_wd*sel_tke).values]:
     try:
         data=xr.open_dataset(f)
         data=data.where((data.range>=min_range)*(data.range<=max_range),drop=True)
