@@ -25,9 +25,9 @@ plt.close('all')
 source_inflow=os.path.join(cd,'data/g3p3/roof.lidar.z01.c2/roof.lidar.z01.c2.20250314.20250720.csv')
 
 #stats
-bin_hour=np.arange(25)
-perc_lim=[5,95]
-p_value=0.05
+bin_hour=np.arange(25)#bins in hour
+perc_lim=[5,95]#[%] percentile limits
+p_value=0.05# p-value for c.i.
 
 #%% Functions
 def filt_stat(x,func,perc_lim=[5,95]):
@@ -74,20 +74,18 @@ inflow_df=pd.read_csv(source_inflow).set_index('Time (UTC)')
 inflow_df.index= pd.to_datetime(inflow_df.index)
 inflow=xr.Dataset.from_dataframe(inflow_df).rename({'Time (UTC)':'time'})
 
+#extract variables
 ws=inflow.ws.values
 wd=inflow.wd.values
 tke=inflow.tke.values
 
-
 #%% Main
+
+#hour vector
 hour=np.array([(t-np.datetime64(str(t)[:10]))/np.timedelta64(1,'h') for t in inflow.time.values])
 
-#daily cycles of temperature
+#daily cycles
 hour_avg=(bin_hour[:-1]+bin_hour[1:])/2
-
-f_avg_all=np.zeros(len(hour_avg))
-f_low_all=np.zeros(len(hour_avg))
-f_top_all=np.zeros(len(hour_avg))
 
 f_sel=ws
 real=~np.isnan(f_sel)
