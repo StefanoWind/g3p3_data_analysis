@@ -32,7 +32,7 @@ if len(sys.argv)==1:
     edate='2025-07-02' #end date
     path_config=os.path.join(cd,'configs/config.yaml') #config path
     path_inflow='roof.lidar.z01.c2.20250314.20250720.csv'
-    ws_range=[5,8]
+    ws_range=[5,12]
     wd_range=[170,190]
     tke_range=[0,1]
     
@@ -125,7 +125,7 @@ sel_ws=(inflow_int.ws>=ws_range[0])*(inflow_int.ws<ws_range[1])
 sel_wd=(inflow_int.wd>=wd_range[0])*(inflow_int.wd<wd_range[1])
 sel_tke=(inflow_int.tke>=tke_range[0])*(inflow_int.tke<tke_range[1])
 
-print(f'{np.sum((sel_ws*sel_ws*sel_tke).values)} files meet conditions',flush=True)
+print(f'{np.sum((sel_ws*sel_wd*sel_tke).values)} files meet conditions',flush=True)
 x_all=[]
 y_all=[]
 u_all=[]
@@ -136,15 +136,14 @@ for f in files_sel[(sel_ws*sel_wd*sel_tke).values]:
         data=data.where((data.range>=min_range)*(data.range<=max_range),drop=True)
         
         #cos fit
-        ws=np.round(np.float64(inflow_int.ws.isel(time=i_f)),2)
-        wd=np.round(np.float64(inflow_int.wd.isel(time=i_f)),2)
-        print(f'Attempting cosine fit with initial guess {[ws,wd]}',flush=True)
+        # ws=np.round(np.float64(inflow_int.ws.sel(time=time[i_f])),2)
+        # wd=np.round(np.float64(inflow_int.wd.sel(time=time[i_f])),2)
+        # print(f'Attempting cosine fit with initial guess {[ws,wd]}',flush=True)
         
         azi=data.azimuth.transpose('range','beamID','scanID').values.ravel()
         rws=data.wind_speed.where(data.qc_wind_speed==0).values.ravel()
         real=~np.isnan(azi+rws)
-        popt = sp.optimize.curve_fit(cos_fit, azi[real], -rws[real],bounds=([0,0], [30,360]),
-                                     p0=[ws,wd])[0]
+        popt = sp.optimize.curve_fit(cos_fit, azi[real], -rws[real],bounds=([0,0], [30,360]))[0]
         
         # if popt[0]<ws_range[0] or popt[0]>ws_range[1] or popt[1]<wd_range[0] or popt[1]>wd_range[1]:
         #     print(f'Wind speed or direction outside of range, skipping {f}')
@@ -170,7 +169,7 @@ for f in files_sel[(sel_ws*sel_wd*sel_tke).values]:
         y_all=np.append(y_all,data.y.values.ravel()[real])
         u_all=np.append(u_all,u.values.ravel()[real])
         
-        print(f'{i_f+1}/{np.sum((sel_ws*sel_ws*sel_tke).values)} files done',flush=True)
+        print(f'{i_f+1}/{np.sum((sel_ws*sel_wd*sel_tke).values)} files done',flush=True)
         
     except Exception as e:
         print(f"An error occurred at file {f}: {e}")
