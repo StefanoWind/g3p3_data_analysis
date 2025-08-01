@@ -100,6 +100,8 @@ def cos_fit(azi,U,wd):
 with open(path_config, 'r') as fid:
     config = yaml.safe_load(fid)
     
+print(f"Started processing with inputs: \n start date = {sdate} \n end data = {edate} \n ws_range = {ws_range} \n wd_range = {wd_range} \n tke_range = {tke_range}")
+    
 #read inflow data
 inflow_df=pd.read_csv(os.path.join(config['path_data'],'g3p3/roof.lidar.z01.c2',path_inflow)).set_index('Time (UTC)')
 inflow_df.index= pd.to_datetime(inflow_df.index)
