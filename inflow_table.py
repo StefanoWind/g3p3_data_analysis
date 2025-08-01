@@ -20,8 +20,8 @@ warnings.filterwarnings('ignore')
 
 #users inputs
 if len(sys.argv)==1:
-    sdate='2025-05-01' #start date
-    edate='2025-07-02' #end date
+    sdate='2025-03-14' #start date
+    edate='2025-07-31' #end date
     path_config=os.path.join(cd,'configs/config.yaml') #config path
 else:
     sdate=sys.argv[1] #start date
@@ -74,6 +74,6 @@ output.index.name='Time (UTC)'
 
 t1=str(data.time.values[0])[:10].replace('-','')
 t2=str(data.time.values[-1])[:10].replace('-','')
-output.to_csv(os.path.join('data','g3p3','roof.lidar.z01.c2',f'roof.lidar.z01.c2.{t1}.{t2}.csv'))
+output.to_csv(os.path.join(cd,'data','g3p3','roof.lidar.z01.c2',f'roof.lidar.z01.c2.{t1}.{t2}.csv'))
     
     
