@@ -140,7 +140,7 @@ for f in files_sel[(sel_ws*sel_ws*sel_tke).values]:
         rws=data.wind_speed.where(data.qc_wind_speed==0).values.ravel()
         real=~np.isnan(azi+rws)
         popt = sp.optimize.curve_fit(cos_fit, azi[real], -rws[real],bounds=([0,0], [30,360]),
-                                     p0=(inflow_int.ws.isel(time=i_f),inflow_int.wd.isel(time=i_f)))[0]
+                                     p0=[inflow_int.ws.isel(time=i_f),inflow_int.wd.isel(time=i_f)])[0]
         
         # select azimuth
         data=data.where((data.azimuth>=min_azi)*(data.azimuth<=max_azi),drop=True)
