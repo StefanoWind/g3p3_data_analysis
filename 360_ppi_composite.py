@@ -28,7 +28,7 @@ plt.close('all')
 
 #users inputs
 if len(sys.argv)==1:
-    sdate='2025-03-01' #start date
+    sdate='2025-05-29' #start date
     edate='2025-07-02' #end date
     path_config=os.path.join(cd,'configs/config.yaml') #config path
     path_inflow='roof.lidar.z01.c2.20250314.20250720.csv'
@@ -111,8 +111,12 @@ inflow=xr.Dataset.from_dataframe(inflow_df).rename({'Time (UTC)':'time'})
 source=os.path.join(config['path_data'],'g3p3/roof.lidar.z01.b0/*360.ppi*nc')
 files=np.array(sorted(glob.glob(source)))
 dates=np.array([datetime.strptime(os.path.basename(f).split('.')[4],'%Y%m%d') for f in files])
-sel=(dates>=datetime.strptime(sdate,'%Y-%m-%d'))*(dates<=datetime.strptime(edate,'%Y-%m-%d'))
-files_sel=files[sel]
+sel_time=(dates>=datetime.strptime(sdate,'%Y-%m-%d'))*(dates<=datetime.strptime(edate,'%Y-%m-%d'))
+files_sel=files[sel_time]
+
+#compose name
+name_save=f'{sdate}.{edate}.{ws_range[0]}.{ws_range[1]}.{wd_range[0]}.{wd_range[1]}.{tke_range[0]}.{tke_range[1]}'
+os.makedirs(os.path.join(cd,'figures',name_save),exist_ok=True)
 
 #%% Main
 
@@ -125,29 +129,22 @@ sel_ws=(inflow_int.ws>=ws_range[0])*(inflow_int.ws<ws_range[1])
 sel_wd=(inflow_int.wd>=wd_range[0])*(inflow_int.wd<wd_range[1])
 sel_tke=(inflow_int.tke>=tke_range[0])*(inflow_int.tke<tke_range[1])
 
-print(f'{np.sum((sel_ws*sel_wd*sel_tke).values)} files meet conditions',flush=True)
+sel=(sel_ws*sel_wd*sel_tke).values
+
+print(f'{np.sum(sel)} files meet conditions',flush=True)
 x_all=[]
 y_all=[]
 u_all=[]
 i_f=0
-for f in files_sel[(sel_ws*sel_wd*sel_tke).values]:
+for f in files_sel[sel]:
     try:
         data=xr.open_dataset(f)
         data=data.where((data.range>=min_range)*(data.range<=max_range),drop=True)
-        
-        #cos fit
-        # ws=np.round(np.float64(inflow_int.ws.sel(time=time[i_f])),2)
-        # wd=np.round(np.float64(inflow_int.wd.sel(time=time[i_f])),2)
-        # print(f'Attempting cosine fit with initial guess {[ws,wd]}',flush=True)
-        
+
         azi=data.azimuth.transpose('range','beamID','scanID').values.ravel()
         rws=data.wind_speed.where(data.qc_wind_speed==0).values.ravel()
         real=~np.isnan(azi+rws)
         popt = sp.optimize.curve_fit(cos_fit, azi[real], -rws[real],bounds=([0,0], [30,360]))[0]
-        
-        # if popt[0]<ws_range[0] or popt[0]>ws_range[1] or popt[1]<wd_range[0] or popt[1]>wd_range[1]:
-        #     print(f'Wind speed or direction outside of range, skipping {f}')
-        #     continue
         
         # select azimuth
         data=data.where((data.azimuth>=min_azi)*(data.azimuth<=max_azi),drop=True)
@@ -160,8 +157,8 @@ for f in files_sel[(sel_ws*sel_wd*sel_tke).values]:
         
         #deproject velocity
         angle=np.radians(data.azimuth-popt[1])
-        u=-data.wind_speed.where(data.qc_wind_speed==0)/np.cos(angle)
-        u=u.where((u/popt[0]>u_lim[0])*(u/popt[0]<u_lim[1]))
+        u=-data.wind_speed.where(data.qc_wind_speed==0)/np.cos(angle)/popt[0]
+        u=u.where((u>u_lim[0])*(u<u_lim[1]))
         
         #stack data
         real=~np.isnan(u.values.ravel())
@@ -169,7 +166,31 @@ for f in files_sel[(sel_ws*sel_wd*sel_tke).values]:
         y_all=np.append(y_all,data.y.values.ravel()[real])
         u_all=np.append(u_all,u.values.ravel()[real])
         
-        print(f'{i_f+1}/{np.sum((sel_ws*sel_wd*sel_tke).values)} files done',flush=True)
+        #plot
+        plt.figure(figsize=(18,8))
+        for s in range(len(data.scanID)):
+            ax=plt.subplot(1,len(data.scanID),s+1)
+            cf=plt.pcolor(data.x.isel(scanID=s),data.y.isel(scanID=s),u.isel(scanID=s),vmin=0.3,vmax=1.1,cmap='coolwarm')
+            ax=plt.gca()
+            ax.set_aspect('equal')
+            plt.grid()
+            plt.plot(np.cos(np.radians(90-config['g3p3_azi']))*config['g3p3_range'],
+                     np.sin(np.radians(90-config['g3p3_azi']))*config['g3p3_range'],'ks',markersize=5)
+            plt.plot(np.cos(np.radians(90-config['hotsstar_azi']))*config['hotsstar_range'],
+                     np.sin(np.radians(90-config['hotsstar_azi']))*config['hotsstar_range'],'ks',markersize=5)
+            plt.plot(0,0,'ks',markersize=5)
+            plt.xlabel('W-E [m]')
+            if s==0:
+                plt.ylabel('S-N [m]')
+            else:
+                ax.set_yticklabels([])
+            if s==1:
+                plt.title(os.path.basename(f))
+                
+        plt.savefig(os.path.join(cd,'figures',name_save,f'{os.path.basename(f).replace("nc","png")}'))
+        plt.close()
+            
+        print(f'{i_f+1}/{np.sum(sel)} files done',flush=True)
         
     except Exception as e:
         print(f"An error occurred at file {f}: {e}")
@@ -199,10 +220,8 @@ ti_int=u_std_int/u_avg_int*100
 #%% Plots
 plt.figure(figsize=(18,8.5))
 ax=plt.subplot(1,2,1)
-vmin=np.floor(np.nanpercentile(u_avg_int,0.1)/0.25)*0.25
-vmax=np.ceil(np.nanpercentile(u_avg_int,95)/0.25)*0.25
-cf=plt.contourf(x,y,u_avg_int.T,np.arange(vmin,vmax+0.25,0.25),cmap='coolwarm',extend='both')
-plt.contour(x,y,u_avg_int.T,np.arange(vmin,vmax+0.25,0.25),colors='k',linewidth=.1,alpha=0.1,extend='both')
+cf=plt.contourf(x,y,u_avg_int.T,np.arange(0.3,1.15,0.05),cmap='coolwarm',extend='both')
+plt.contour(x,y,u_avg_int.T,np.arange(0.3,1.15,0.05),colors='k',linewidth=.1,alpha=0.1,extend='both')
 ax=plt.gca()
 ax.set_aspect('equal')
 plt.grid()
@@ -216,11 +235,11 @@ plt.ylabel('S-N [m]')
 plt.text(xmin+10,ymax-100,r'Wind speed limits [m s$^{-1}$]: '+str(ws_range[0])+'-'+str(ws_range[1])+'\n'+\
                      r'Wind direction limits [$^\circ$]: '+ str(wd_range[0])+'-'+str(wd_range[1])+'\n'+\
                      r'TKE limits [m$^2$/s$^2$]: '+str(tke_range[0])+'-'+str(tke_range[1])+'\n'+\
-                     f'File count: {np.sum((sel_ws*sel_ws*sel_tke).values)}',
+                     f'File count: {np.sum(sel)}',
                      bbox={'edgecolor':'k','facecolor':'w'})
 plt.xticks(np.arange(xmin,xmax+1,100))
 plt.yticks(np.arange(ymin,ymax+1,100))
-plt.colorbar(cf,label='Wind speed [m/s]')
+plt.colorbar(cf,label='Normalized wind speed')
 
 ax=plt.subplot(1,2,2)
 vmin=np.floor(np.nanpercentile(ti_int,5)/2)*2
@@ -240,12 +259,12 @@ plt.ylabel('S-N [m]')
 plt.text(xmin+10,ymax-100,r'Wind speed limits [m s$^{-1}$]: '+str(ws_range[0])+'-'+str(ws_range[1])+'\n'+\
                      r'Wind direction limits [$^\circ$]: '+ str(wd_range[0])+'-'+str(wd_range[1])+'\n'+\
                      r'TKE limits [m$^2$/s$^2$]: '+str(tke_range[0])+'-'+str(tke_range[1])+'\n'+\
-                     f'File count: {np.sum((sel_ws*sel_ws*sel_tke).values)}',
+                     f'File count: {np.sum(sel)}',
                      bbox={'edgecolor':'k','facecolor':'w'})
 plt.xticks(np.arange(xmin,xmax+1,100))
 plt.yticks(np.arange(ymin,ymax+1,100))
 plt.colorbar(cf,label='TI [%]')
 
 os.makedirs(os.path.join(cd,'figures'),exist_ok=True)
-plt.savefig(os.path.join(cd,'figures',f'{sdate}.{edate}.{ws_range[0]}.{ws_range[1]}.{wd_range[0]}.{wd_range[1]}.{tke_range[0]}.{tke_range[1]}.png'))
+plt.savefig(os.path.join(cd,'figures',f'{name_save}.png'))
 
